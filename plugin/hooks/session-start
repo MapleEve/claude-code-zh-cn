@@ -217,17 +217,33 @@ native_platform() {
         return
     fi
 
-    case "$(uname -s 2>/dev/null)-$(uname -m 2>/dev/null)" in
+    local system_arch linux_arch=""
+    system_arch="$(uname -s 2>/dev/null)-$(uname -m 2>/dev/null)"
+    case "$system_arch" in
         Darwin-arm64|Darwin-aarch64)
             printf 'darwin-arm64'
+            return
+            ;;
+        Linux-x86_64|Linux-amd64)
+            linux_arch="x64"
+            ;;
+        Linux-arm64|Linux-aarch64)
+            linux_arch="arm64"
             ;;
         MINGW64_NT-*|MSYS_NT-*|CYGWIN_NT-*)
             printf 'win32-x64'
+            return
             ;;
         *)
-            printf ''
+            return
             ;;
     esac
+
+    if node -e 'const r=process.report&&process.report.getReport?process.report.getReport():null;process.exit(r&&r.header&&r.header.glibcVersionRuntime?0:1)' >/dev/null 2>&1; then
+        printf 'linux-%s' "$linux_arch"
+    else
+        printf 'linux-%s-musl' "$linux_arch"
+    fi
 }
 
 is_supported_native_version() {
@@ -236,6 +252,7 @@ is_supported_native_version() {
     local support_file="$PLUGIN_ROOT/support-window.json"
 
     if [ ! -f "$support_file" ]; then
+        [ "$platform" = "darwin-arm64" ] || return 1
         case "${version:-}" in
             2.1.110|2.1.111|2.1.112)
                 return 0
@@ -256,6 +273,7 @@ const versions = [];
 for (const key of [
   "macosNativeOfficialInstallerExperimental",
   "macosNativeExperimental",
+  "linuxNativeExperimental",
   "windowsNativeExperimental",
 ]) {
   const entry = data[key];
@@ -313,6 +331,22 @@ for (const key of [
 
 process.exit(1);
 NODE
+}
+
+replace_native_binary_from_file() {
+    local source_path="$1"
+    local binary_path="$2"
+    local replacement_path
+
+    replacement_path="$(mktemp "${binary_path}.zh-cn-restore.XXXXXX" 2>/dev/null || true)"
+    [ -n "${replacement_path:-}" ] || return 1
+
+    if cp -p "$source_path" "$replacement_path" 2>/dev/null && mv -f "$replacement_path" "$binary_path" 2>/dev/null; then
+        return 0
+    fi
+
+    rm -f "$replacement_path" 2>/dev/null || true
+    return 1
 }
 
 native_marker_is_current() {
@@ -733,7 +767,7 @@ if [ -n "$NATIVE_BINARY" ]; then
                 # 同版本时恢复 backup 保证干净基底；版本变化时刷新 backup 为当前版本
                 BACKUP_READY=false
                 if [ -f "$backup_path" ] && [ -n "${CURRENT_VERSION:-}" ] && [ "${CURRENT_VERSION:-}" = "${backup_version:-}" ]; then
-                    if cp "$backup_path" "$NATIVE_BINARY" 2>/dev/null; then
+                    if replace_native_binary_from_file "$backup_path" "$NATIVE_BINARY" 2>/dev/null; then
                         BACKUP_READY=true
                     fi
                 else
@@ -788,18 +822,15 @@ if [ -n "$NATIVE_BINARY" ]; then
                                         AUTO_PATCH_MSG="（已自动 patch ${PATCH_COUNT} 处硬编码文字，启动自检通过）"
                                     fi
                                 else
-                                    cp "$backup_path" "$NATIVE_BINARY" 2>/dev/null || true
+                                    if ! replace_native_binary_from_file "$backup_path" "$NATIVE_BINARY" 2>/dev/null; then
+                                        AUTO_PATCH_MSG="（自动 patch 失败且无法恢复；原始备份已保留，请重新运行安装器）"
+                                    fi
                                 fi
                                 ;;
                             *)
                                 # patch-cli 未写回二进制；保持干净英文版本可用。
                                 ;;
                         esac
-                    else
-                        # 提取失败不触碰二进制；保留当前英文版本。
-                        if [ -f "$backup_path" ]; then
-                            cp "$backup_path" "$NATIVE_BINARY" 2>/dev/null || true
-                        fi
                     fi
                 fi
                 rm -f "$tmp_js" "$status_file"

@@ -17,6 +17,27 @@ function patchFixture(lines) {
   return fs.readFileSync(cliFile, "utf8");
 }
 
+function patchFixtureRepeated(lines, times) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cczh-patch-repeat-"));
+  const cliFile = path.join(dir, "cli.js");
+  fs.writeFileSync(cliFile, lines.join("\n"));
+  for (let i = 0; i < times; i += 1) {
+    execFileSync("node", [patchCli, cliFile, translations], { encoding: "utf8" });
+  }
+  return fs.readFileSync(cliFile, "utf8");
+}
+
+function runPatchedFixture(lines) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cczh-patch-run-"));
+  const cliFile = path.join(dir, "cli.js");
+  fs.writeFileSync(cliFile, lines.join("\n"));
+  execFileSync("node", [patchCli, cliFile, translations], { encoding: "utf8" });
+  return {
+    patched: fs.readFileSync(cliFile, "utf8"),
+    output: execFileSync("node", [cliFile], { encoding: "utf8" }).trim(),
+  };
+}
+
 test("past-tense status verbs are translated when upstream escapes Sautéed", () => {
   const patched = patchFixture([
     'var verbs=["Baked","Brewed","Churned","Cogitated","Cooked","Crunched","Saut\\xE9ed","Worked"];',
@@ -803,4 +824,141 @@ test("issue 122 slash and prompt command descriptions are translated", () => {
     assert.equal(patched.includes(en), false, patched);
     assert.match(patched, new RegExp(zh.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
+});
+
+test("Claude Code 2.1.226 reviewed display literals patch without changing protected tokens", () => {
+  const expected = [
+    ["requested thread not in this result", "请求的评论线程不在此结果中"],
+    ["no comment threads yet", "暂无评论线程"],
+    ["read 1 comment thread (filtered)", "已读取 1 个评论线程（已筛选）"],
+    ["replied to comment thread", "已回复评论线程"],
+    ["reply not posted (summon already answered)", "未发布回复（召唤已得到回应）"],
+    ["reply needs thread activation by the user", "需要用户先激活该评论线程才能回复"],
+    ["no such document", "文档不存在"],
+    ["database write committed", "数据库写入已提交"],
+    ["database write not committed", "数据库写入未提交"],
+    ["- Remote workspace:", "- 远程工作区："],
+    ["git metadata is not collected from this machine", "未从此计算机收集 Git 元数据"],
+    ["connected \\xB7 session token rejected", "已连接 · 会话令牌被拒绝"],
+    ["claude.ai rejected the session token. Run /login, then reconnect.", "claude.ai 拒绝了会话令牌。请运行 /login，然后重新连接。"],
+    ["Activating plugin\\u2026", "正在激活插件…"],
+    ["\\u2014 Self-hosted environments \\u2014", "— 自托管环境 —"],
+    ["\\xB7 ask your administrator to trust the configured sandbox CA \\u2014 see https://code.claude.com/docs/en/sandboxing", "· 请联系管理员信任已配置的沙箱 CA — 参见 https://code.claude.com/docs/en/sandboxing"],
+    ["Message body (this is what will be delivered):", "消息正文（将投递以下内容）："],
+    ["Held message from another session", "来自另一会话的待审消息"],
+    ["Couldn't share the transcript.", "无法分享对话记录。"],
+    ["You can share details with /feedback instead.", "你可以改用 /feedback 分享详细信息。"],
+    ["Thanks \\u2014 noted as a bad memory.", "谢谢 — 已标记为不良记忆。"],
+    ["Write the self-contained HTML report (scores, prompts, grader verdicts) to <path> instead of the results dir", "将自包含 HTML 报告（评分、提示词和评分器结论）写入 <path>，而不是结果目录"],
+    ["Also require publishing the report to claude.ai (already the default when your account supports it); explains why if unavailable", "同时要求将报告发布到 claude.ai（账号支持时已为默认行为）；若不可用则说明原因"],
+    ["Keep the HTML report local only; skip publishing it to claude.ai", "仅在本地保留 HTML 报告；跳过发布到 claude.ai"],
+    ["Run the authoring interview (already the default in a terminal); requires an interactive terminal", "运行创作访谈（终端中已为默认行为）；需要交互式终端"],
+    ["Skip the interactive picker. On headless surfaces, pass --yes=<digest> from the `/import` preview.", "跳过交互式选择器。在无界面环境中，传入 `/import` 预览给出的 --yes=<digest>。"],
+  ];
+  const patched = patchFixture([
+    ...expected.map(([en], index) => `const display_${index}="${en}";`),
+    "",
+  ]);
+
+  for (const [en, zh] of expected) {
+    assert.equal(patched.includes(en), false, `raw display literal remained: ${en}\n${patched}`);
+    assert.equal(patched.includes(zh), true, `missing localized display literal: ${zh}\n${patched}`);
+  }
+  for (const token of [
+    "/login",
+    "/feedback",
+    "https://code.claude.com/docs/en/sandboxing",
+    "<path>",
+    "--yes=<digest>",
+    "`/import`",
+    "claude.ai",
+  ]) {
+    assert.equal(patched.includes(token), true, `protected token changed: ${token}\n${patched}`);
+  }
+});
+
+test("mark-bad chord hint is localized without broad raw-action replacement", () => {
+  const source = [
+    'const chord={chord:"b",action:"mark bad"};',
+    'const rawAction={action:"mark bad"};',
+    'const otherChord={chord:"x",action:"mark bad"};',
+    'const nearMiss={chord:"b",action:"mark bad",format:"compact"};',
+    "",
+  ];
+  const patched = patchFixture(source);
+
+  assert.match(patched, /\{chord:"b",action:"标记为不良"\}/);
+  assert.match(patched, /const rawAction=\{action:"mark bad"\}/);
+  assert.match(patched, /\{chord:"x",action:"mark bad"\}/);
+  assert.match(patched, /\{chord:"b",action:"mark bad",format:"compact"\}/);
+  assert.equal(patchFixtureRepeated(source, 1), patchFixtureRepeated(source, 2));
+});
+
+test("Claude Code 2.1.226 q9v unknown-model warning keeps branches and dynamic values", () => {
+  const q9v = 'function q9v(e,t,r){let{source:n,window:o}=Nq(e,t,r);if(n!=="unknown-model")return null;let i=Jmf(e),s=te.CLAUDE_CODE_MAX_CONTEXT_TOKENS;if(i&&s!==void 0&&s>0)return null;let a=[];if(!Jne())a.push("append [1m] to the model name for 1M");if(i)a.push("set CLAUDE_CODE_MAX_CONTEXT_TOKENS to its real window");let l=a.length>0?`If the model accepts more, ${a.join(", or ")}; to make it recognized, `:"To make it recognized, ";return`"${e}" is not a model this version of Claude Code recognizes, so auto-compact will keep this session within ${Ua(o)} tokens (the context window it assumes). ${l}map it in the modelOverrides setting or update Claude Code; CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT=1 restores the previous wait-for-the-API behavior.`}';
+  const { patched, output } = runPatchedFixture([
+    'let noticeSource="unknown-model",noticeWindow=200000,modelMapped=false,oneMillionRecognized=false;',
+    'function Nq(){return{source:noticeSource,window:noticeWindow}}',
+    'function Jmf(){return modelMapped}',
+    'const te={CLAUDE_CODE_MAX_CONTEXT_TOKENS:void 0};',
+    'function Jne(){return oneMillionRecognized}',
+    'function Ua(value){return `${value/1000}k`}',
+    q9v,
+    'const notices=[];',
+    'notices.push(q9v("glm-5.2"));',
+    'oneMillionRecognized=true;notices.push(q9v("custom-sonnet"));',
+    'modelMapped=true;notices.push(q9v("mapped-model-env-only"));',
+    'oneMillionRecognized=false;modelMapped=true;noticeWindow=1000000;notices.push(q9v("mapped-model"));',
+    'te.CLAUDE_CODE_MAX_CONTEXT_TOKENS=1000000;notices.push(q9v("mapped-model"));',
+    'noticeSource="auto";te.CLAUDE_CODE_MAX_CONTEXT_TOKENS=void 0;notices.push(q9v("known-model"));',
+    'console.log(JSON.stringify(notices));',
+    "",
+  ]);
+  const notices = JSON.parse(output);
+
+  assert.equal(notices.length, 6);
+  assert.match(notices[0], /^"glm-5\.2" 不是此版本 Claude Code 可识别的模型/);
+  assert.match(notices[0], /200k 个 token/);
+  assert.match(notices[0], /附加 \[1m\] 以启用 1M/);
+  assert.doesNotMatch(notices[0], /CLAUDE_CODE_MAX_CONTEXT_TOKENS/);
+  assert.match(notices[1], /如需让 Claude Code 识别该模型，请在 modelOverrides 设置中映射/);
+  assert.doesNotMatch(notices[1], /\[1m\]|CLAUDE_CODE_MAX_CONTEXT_TOKENS/);
+  assert.match(notices[2], /将 CLAUDE_CODE_MAX_CONTEXT_TOKENS 设为该模型的真实窗口/);
+  assert.doesNotMatch(notices[2], /\[1m\]/);
+  assert.match(notices[3], /启用 1M，或将 CLAUDE_CODE_MAX_CONTEXT_TOKENS 设为该模型的真实窗口/);
+  assert.match(notices[3], /1000k 个 token/);
+  assert.equal(notices[4], null);
+  assert.equal(notices[5], null);
+  assert.equal(patched.includes("append [1m] to the model name for 1M"), false);
+  assert.equal(patched.includes("If the model accepts more"), false);
+  assert.equal(patched.includes("is not a model this version"), false);
+  for (const protectedToken of [
+    'n!=="unknown-model"',
+    "Jmf(e)",
+    "Jne()",
+    "Ua(o)",
+    "modelOverrides",
+    "CLAUDE_CODE_MAX_CONTEXT_TOKENS",
+    "CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT=1",
+  ]) {
+    assert.equal(patched.includes(protectedToken), true, `protected q9v token changed: ${protectedToken}`);
+  }
+});
+
+test("q9v warning localization is exact-anchor fail-safe and idempotent", () => {
+  const exact = 'function q9v(e,t,r){let{source:n,window:o}=Nq(e,t,r);if(n!=="unknown-model")return null;let i=Jmf(e),s=te.CLAUDE_CODE_MAX_CONTEXT_TOKENS;if(i&&s!==void 0&&s>0)return null;let a=[];if(!Jne())a.push("append [1m] to the model name for 1M");if(i)a.push("set CLAUDE_CODE_MAX_CONTEXT_TOKENS to its real window");let l=a.length>0?`If the model accepts more, ${a.join(", or ")}; to make it recognized, `:"To make it recognized, ";return`"${e}" is not a model this version of Claude Code recognizes, so auto-compact will keep this session within ${Ua(o)} tokens (the context window it assumes). ${l}map it in the modelOverrides setting or update Claude Code; CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT=1 restores the previous wait-for-the-API behavior.`}';
+  const nearMiss = exact.replace("function q9v", "function q9w");
+  const nearMissPatched = patchFixture([nearMiss, ""]);
+
+  assert.equal(nearMissPatched.includes("If the model accepts more"), true, nearMissPatched);
+  assert.equal(nearMissPatched.includes("不是此版本 Claude Code 可识别的模型"), false, nearMissPatched);
+  assert.equal(
+    patchFixtureRepeated([exact, ""], 1),
+    patchFixtureRepeated([exact, ""], 2),
+    "q9v localization should be idempotent"
+  );
+
+  const duplicatePatched = patchFixture([exact, exact, ""]);
+  assert.equal(duplicatePatched.match(/If the model accepts more/g)?.length, 2, duplicatePatched);
+  assert.equal(duplicatePatched.includes("不是此版本 Claude Code 可识别的模型"), false, duplicatePatched);
 });

@@ -8036,5 +8036,109 @@
   {
     "en": "Your usage allocation has been disabled by your admin",
     "zh": "您的使用配额已被管理员禁用"
+  },
+  {
+    "en": "requested thread not in this result",
+    "zh": "请求的评论线程不在此结果中"
+  },
+  {
+    "en": "no comment threads yet",
+    "zh": "暂无评论线程"
+  },
+  {
+    "en": "read 1 comment thread (filtered)",
+    "zh": "已读取 1 个评论线程（已筛选）"
+  },
+  {
+    "en": "replied to comment thread",
+    "zh": "已回复评论线程"
+  },
+  {
+    "en": "reply not posted (summon already answered)",
+    "zh": "未发布回复（召唤已得到回应）"
+  },
+  {
+    "en": "reply needs thread activation by the user",
+    "zh": "需要用户先激活该评论线程才能回复"
+  },
+  {
+    "en": "no such document",
+    "zh": "文档不存在"
+  },
+  {
+    "en": "database write committed",
+    "zh": "数据库写入已提交"
+  },
+  {
+    "en": "database write not committed",
+    "zh": "数据库写入未提交"
+  },
+  {
+    "en": "- Remote workspace:",
+    "zh": "- 远程工作区："
+  },
+  {
+    "en": "git metadata is not collected from this machine",
+    "zh": "未从此计算机收集 Git 元数据"
+  },
+  {
+    "en": "connected \\xB7 session token rejected",
+    "zh": "已连接 · 会话令牌被拒绝"
+  },
+  {
+    "en": "claude.ai rejected the session token. Run /login, then reconnect.",
+    "zh": "claude.ai 拒绝了会话令牌。请运行 /login，然后重新连接。"
+  },
+  {
+    "en": "Activating plugin\\u2026",
+    "zh": "正在激活插件…"
+  },
+  {
+    "en": "\\u2014 Self-hosted environments \\u2014",
+    "zh": "— 自托管环境 —"
+  },
+  {
+    "en": "\\xB7 ask your administrator to trust the configured sandbox CA \\u2014 see https://code.claude.com/docs/en/sandboxing",
+    "zh": "· 请联系管理员信任已配置的沙箱 CA — 参见 https://code.claude.com/docs/en/sandboxing"
+  },
+  {
+    "en": "Message body (this is what will be delivered):",
+    "zh": "消息正文（将投递以下内容）："
+  },
+  {
+    "en": "Held message from another session",
+    "zh": "来自另一会话的待审消息"
+  },
+  {
+    "en": "Couldn't share the transcript.",
+    "zh": "无法分享对话记录。"
+  },
+  {
+    "en": "You can share details with /feedback instead.",
+    "zh": "你可以改用 /feedback 分享详细信息。"
+  },
+  {
+    "en": "Thanks \\u2014 noted as a bad memory.",
+    "zh": "谢谢 — 已标记为不良记忆。"
+  },
+  {
+    "en": "Write the self-contained HTML report (scores, prompts, grader verdicts) to <path> instead of the results dir",
+    "zh": "将自包含 HTML 报告（评分、提示词和评分器结论）写入 <path>，而不是结果目录"
+  },
+  {
+    "en": "Also require publishing the report to claude.ai (already the default when your account supports it); explains why if unavailable",
+    "zh": "同时要求将报告发布到 claude.ai（账号支持时已为默认行为）；若不可用则说明原因"
+  },
+  {
+    "en": "Keep the HTML report local only; skip publishing it to claude.ai",
+    "zh": "仅在本地保留 HTML 报告；跳过发布到 claude.ai"
+  },
+  {
+    "en": "Run the authoring interview (already the default in a terminal); requires an interactive terminal",
+    "zh": "运行创作访谈（终端中已为默认行为）；需要交互式终端"
+  },
+  {
+    "en": "Skip the interactive picker. On headless surfaces, pass --yes=<digest> from the `/import` preview.",
+    "zh": "跳过交互式选择器。在无界面环境中，传入 `/import` 预览给出的 --yes=<digest>。"
   }
 ]

@@ -918,6 +918,26 @@ function installWorkflowLifecycleResidueLocalization() {
     );
 }
 
+function installCli226DisplayDeltaLocalization() {
+    // The `action` prop on the chord hint is display copy. Keep unrelated raw
+    // action/state strings untouched by requiring the complete `b` chord shape.
+    tryRegexReplace(
+        /(\{chord:"b",action:)"mark bad"(\})/g,
+        (match, prefix, suffix) => `${prefix}"标记为不良"${suffix}`
+    );
+
+    // Claude Code 2.1.226's q9v startup-warning builder. This is intentionally
+    // an exact whole-function anchor: its branch conditions, dynamic model and
+    // window expressions, setting/env identifiers, and control flow stay byte
+    // for byte identical; only the user-visible literals are localized.
+    const unknownModelNoticeSource = 'function q9v(e,t,r){let{source:n,window:o}=Nq(e,t,r);if(n!=="unknown-model")return null;let i=Jmf(e),s=te.CLAUDE_CODE_MAX_CONTEXT_TOKENS;if(i&&s!==void 0&&s>0)return null;let a=[];if(!Jne())a.push("append [1m] to the model name for 1M");if(i)a.push("set CLAUDE_CODE_MAX_CONTEXT_TOKENS to its real window");let l=a.length>0?`If the model accepts more, ${a.join(", or ")}; to make it recognized, `:"To make it recognized, ";return`"${e}" is not a model this version of Claude Code recognizes, so auto-compact will keep this session within ${Ua(o)} tokens (the context window it assumes). ${l}map it in the modelOverrides setting or update Claude Code; CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT=1 restores the previous wait-for-the-API behavior.`}';
+    const unknownModelNoticeLocalized = 'function q9v(e,t,r){let{source:n,window:o}=Nq(e,t,r);if(n!=="unknown-model")return null;let i=Jmf(e),s=te.CLAUDE_CODE_MAX_CONTEXT_TOKENS;if(i&&s!==void 0&&s>0)return null;let a=[];if(!Jne())a.push("在模型名称后附加 [1m] 以启用 1M");if(i)a.push("将 CLAUDE_CODE_MAX_CONTEXT_TOKENS 设为该模型的真实窗口");let l=a.length>0?`如果模型支持更大的窗口，请${a.join("，或")}；如需让 Claude Code 识别该模型，请`:"如需让 Claude Code 识别该模型，请";return`"${e}" 不是此版本 Claude Code 可识别的模型，因此自动压缩会将本会话限制在 ${Ua(o)} 个 token 内（这是它假定的上下文窗口）。${l}在 modelOverrides 设置中映射该模型，或更新 Claude Code；设置 CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT=1 可恢复此前等待 API 返回的行为。`}';
+    const unknownModelNoticeMatches = s.split(unknownModelNoticeSource).length - 1;
+    if (unknownModelNoticeMatches === 1) {
+        tryReplace(unknownModelNoticeSource, unknownModelNoticeLocalized);
+    }
+}
+
 // === 特殊 patch（基于精确代码模式匹配，安全）===
 // 这些 patch 匹配非常特定的代码模式，不会误伤标识符
 
@@ -932,6 +952,7 @@ for (const step of [
     installEffortAndWorkflowFooterLocalization,
     installCommonVisibleResidueLocalization,
     installWorkflowLifecycleResidueLocalization,
+    installCli226DisplayDeltaLocalization,
 ]) {
     try {
         step();

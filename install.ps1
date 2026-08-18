@@ -56,6 +56,26 @@ function write-unpublished-window-note {
     Write-CN "  提醒：本机自验证是临时 patch，不等于已发布支持；升到未发布窗口时请先看支持窗口，未收录就等插件 Release 或临时退回已验证版本。" Yellow
 }
 
+function test-binary-writable {
+    param([string]$Path)
+    if (-not (Test-Path $Path)) { return $false }
+    try {
+        $fs = [System.IO.File]::Open($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+        $fs.Close()
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+function find-claude-processes {
+    $procs = @()
+    try {
+        $procs = @(Get-Process -Name claude -ErrorAction Stop)
+    } catch { }
+    return $procs
+}
+
 function banner {
     if ($SkipBanner) { return }
     Write-Host ""
@@ -1171,6 +1191,19 @@ function patch-native-bun {
         write-unpublished-window-note
     } else {
         Write-Host "  版本: $currentVersion（已验证）"
+    }
+
+    if (-not (test-binary-writable $BinaryPath)) {
+        $procs = find-claude-processes
+        $procList = ($procs | ForEach-Object { "PID=$($_.Id)" }) -join ", "
+        if (-not $procList) { $procList = "（未列出 claude 进程，可能由其他句柄占用）" }
+        Write-CN "  原生二进制被运行中的 Claude Code 进程占用，无法写入（$procList）" Red
+        Write-CN "  请手动退出所有 Claude Code 实例（关闭所有 CC 窗口，含当前会话），然后重新运行 install.ps1。" Yellow
+        Write-CN "  Layer 1~3（settings / 插件目录 / hooks）已在本会话写入；CLI Patch 待所有实例退出后重跑才能完成。" Yellow
+        write-support-window-link
+        $script:CliPatchStatusSummary = "已中止（原生二进制被运行中的 Claude Code 占用，需手动退出所有 claude 实例后重跑）"
+        Write-CN "脚本停止。" Red
+        exit 1
     }
 
     $depStatus = (node $helper check-deps 2>$null)
